@@ -313,7 +313,7 @@ abstract class RealmInterface {
       required bool doneWithTransaction,
       required bool active});
 
-  Future<Variant?> getVariantById({required int id});
+  FutureOr<Variant?> getVariantById({required int id});
   bool isTaxEnabled({required int businessId});
   Future<Receipt?> createReceipt(
       {required RwApiResponse signature,

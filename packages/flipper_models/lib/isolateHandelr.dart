@@ -20,7 +20,55 @@ import 'dart:collection';
 import 'package:flutter/services.dart';
 import 'dart:async';
 
-class IsolateHandler {
+mixin StockPatch {
+  static void patchStock(
+      {Realm? localRealm,
+      required String URI,
+      required Function(String) sendPort}) async {
+    List<Stock> stocks =
+        localRealm!.query<Stock>(r'ebmSynced ==$0', [false]).toList();
+
+    // // Fetching all variant ids from stocks
+    List<int?> variantIds = stocks.map((stock) => stock.variantId).toList();
+    Map<int, Variant?> variantMap = {};
+    localRealm.query<Variant>(r'id IN $0', [variantIds]).forEach((variant) {
+      variantMap[variant.id!] = variant;
+    });
+    for (Stock stock in stocks) {
+      if (!stock.ebmSynced) {
+        //     // Accessing variant from the pre-fetched map
+        Variant? variant = variantMap[stock.variantId];
+        if (variant == null) {
+          continue;
+        }
+
+        try {
+          IStock iStock = IStock(
+            id: stock.id,
+            currentStock: stock.currentStock,
+          );
+          IVariant iVariant =
+              IVariant.fromJson(variant.toEJson().toFlipperJson());
+
+          final response = await RWTax()
+              .saveStockMaster(stock: iStock, variant: iVariant, URI: URI);
+          if (response.resultCd == "000") {
+            // sendPort.send(
+            //     'notification:${response.resultMsg}:stock:${stock.id.toString()}');
+            sendPort('Stock update:${response.resultMsg}');
+          } else {
+            // sendPort.send('notification:${response.resultMsg}}');
+            sendPort('Stock update:${response.resultMsg}}');
+          }
+        } catch (e) {
+          rethrow;
+        }
+      }
+    }
+  }
+}
+
+class IsolateHandler with StockPatch {
   static Realm? localRealm;
   static Future<void> clearFirestoreCache() async {
     try {
@@ -182,46 +230,12 @@ class IsolateHandler {
             } catch (e) {}
           }
 
-          List<Stock> stocks =
-              localRealm!.query<Stock>(r'ebmSynced ==$0', [false]).toList();
-
-          // // Fetching all variant ids from stocks
-          List<int?> variantIds =
-              stocks.map((stock) => stock.variantId).toList();
-          Map<int, Variant?> variantMap = {};
-          localRealm!
-              .query<Variant>(r'id IN $0', [variantIds]).forEach((variant) {
-            variantMap[variant.id!] = variant;
-          });
-          for (Stock stock in stocks) {
-            if (!stock.ebmSynced) {
-              //     // Accessing variant from the pre-fetched map
-              Variant? variant = variantMap[stock.variantId];
-              if (variant == null) {
-                continue;
-              }
-
-              try {
-                IStock iStock = IStock(
-                  id: stock.id,
-                  currentStock: stock.currentStock,
-                );
-                IVariant iVariant =
-                    IVariant.fromJson(variant.toEJson().toFlipperJson());
-
-                final response = await RWTax().saveStockMaster(
-                    stock: iStock, variant: iVariant, URI: URI);
-                if (response.resultCd == "000") {
-                  sendPort.send(
-                      'notification:${response.resultMsg}:stock:${stock.id.toString()}');
-                } else {
-                  sendPort.send('notification:${response.resultMsg}}');
-                }
-              } catch (e) {
-                rethrow;
-              }
-            }
-          }
+          StockPatch.patchStock(
+              URI: URI,
+              localRealm: localRealm,
+              sendPort: (message) {
+                sendPort.send(message);
+              });
 
           List<Variant> variants =
               localRealm!.query<Variant>(r'ebmSynced == $0', [false]).toList();
@@ -239,7 +253,12 @@ class IsolateHandler {
               if (variant.qtyUnitCd == null ||
                   variant.taxTyCd == null ||
                   variant.bhfId == null ||
-                  variant.bhfId!.isEmpty) return;
+                  variant.bhfId!.isEmpty) {
+                // set defaults
+                variant.taxTyCd = "B";
+                variant.bhfId = "00";
+                variant.qtyUnitCd = "U";
+              }
               final response =
                   await RWTax().saveItem(variation: iVariant, URI: URI);
 

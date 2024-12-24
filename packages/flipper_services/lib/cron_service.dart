@@ -32,14 +32,14 @@ class CronService {
   /// The durations of these tasks are determined by the corresponding private methods.
   Future<void> schedule() async {
     await ProxyService.local.spawnIsolate(IsolateHandler.handler);
-    Timer.periodic(Duration(seconds: 40), (Timer t) async {
-      if (ProxyService.box.getUserId() == null ||
-          ProxyService.box.getBusinessId() == null) return;
+    // Timer.periodic(Duration(seconds: 40), (Timer t) async {
+    //   if (ProxyService.box.getUserId() == null ||
+    //       ProxyService.box.getBusinessId() == null) return;
 
-      if (ProxyService.local.sendPort != null) {
-        ProxyService.local.sendMessageToIsolate();
-      }
-    });
+    //   if (ProxyService.local.sendPort != null) {
+    //     ProxyService.local.sendMessageToIsolate();
+    //   }
+    // });
 
     ProxyService.box.remove(key: "customPhoneNumberForPayment");
     List<ConnectivityResult> results = await Connectivity().checkConnectivity();

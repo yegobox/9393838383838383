@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:developer';
+import 'package:flipper_models/isolateHandelr.dart';
 import 'package:supabase_models/brick/models/all_models.dart' as odm;
 import 'package:dio/dio.dart';
 import 'package:flipper_models/NetworkHelper.dart';
@@ -25,7 +26,7 @@ import 'package:talker/talker.dart';
 import 'package:talker_dio_logger/talker_dio_logger_interceptor.dart';
 import 'package:talker_dio_logger/talker_dio_logger_settings.dart';
 
-class RWTax with NetworkHelper implements TaxApi {
+class RWTax with NetworkHelper, StockPatch implements TaxApi {
   String itemPrefix = "flip-";
   // String eBMURL = "https://turbo.yegobox.com";
   // String eBMURL = "http://10.0.2.2:8080/rra";
@@ -355,7 +356,7 @@ class RWTax with NetworkHelper implements TaxApi {
         ProxyService.local.getCustomer(id: transaction.customerId);
 
     // Build request data
-    Map<String, dynamic> requestData = buildRequestData(
+    Map<String, dynamic> requestData = await buildRequestData(
         business: business,
         counter: counter,
         bhFId: bhfId,
@@ -387,6 +388,14 @@ class RWTax with NetworkHelper implements TaxApi {
 
         // Update transaction and item statuses
         updateTransactionAndItems(transaction, items, receiptCodes['rcptTyCd']);
+
+        // ProxyService.local.sendMessageToIsolate();
+        StockPatch.patchStock(
+            URI: URI,
+            localRealm: ProxyService.local.realm,
+            sendPort: (message) {
+              ProxyService.notification.sendLocalNotification(body: message);
+            });
         return data;
       } else {
         throw Exception(
@@ -572,7 +581,7 @@ class RWTax with NetworkHelper implements TaxApi {
   }
 
 // Helper function to build request data
-  Map<String, dynamic> buildRequestData({
+  Future<Map<String, dynamic>> buildRequestData({
     required Business? business,
     required odm.Counter counter,
     required ITransaction transaction,
@@ -586,7 +595,7 @@ class RWTax with NetworkHelper implements TaxApi {
     required String receiptType,
     required DateTime timeToUse,
     required String bhFId,
-  }) {
+  }) async {
     Configurations taxConfigTaxB =
         ProxyService.local.getByTaxType(taxtype: "B");
     Configurations taxConfigTaxA =
@@ -679,6 +688,21 @@ class RWTax with NetworkHelper implements TaxApi {
       },
       "itemList": itemsList,
     };
+    // if it is refund take the sold quantity add it back to the stock
+    if (receiptType == "NR" || receiptType == "TR") {
+      // loop through itemList and add the sold quantity back to the stock
+      for (var item in itemsList) {
+        Variant? variant =
+            await ProxyService.local.getVariantById(id: item['variantId']);
+        if (variant != null) {
+          ProxyService.local.realm!.write(() {
+            variant.stock!.ebmSynced = false;
+            variant.stock?.rsdQty =
+                (variant.stock?.rsdQty ?? 0 + item['qty']).toDouble();
+          });
+        }
+      }
+    }
     if (receiptType == "NR" || receiptType == "CR" || receiptType == "TR") {
       json['rfdRsnCd'] = ProxyService.box.getRefundReason() ?? "05";
     }

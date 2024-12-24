@@ -4473,7 +4473,7 @@ class Variant extends _Variant with RealmEntity, RealmObjectBase, RealmObject {
   @override
   Variant freeze() => RealmObjectBase.freezeObject<Variant>(this);
 
-  EJsonValue toEJson() {
+  EJsonValue toEJson({bool includeStock = false}) {
     return <String, dynamic>{
       'id': id.toEJson(),
       '_id': realmId.toEJson(),
@@ -4526,7 +4526,7 @@ class Variant extends _Variant with RealmEntity, RealmObjectBase, RealmObject {
       'ebmSynced': ebmSynced.toEJson(),
       'taxType': taxType.toEJson(),
       'branchIds': branchIds.toEJson(),
-      'stock': stock.toEJson(),
+      'stock': includeStock ? stock.toEJson() : null,
       'dcRt': dcRt.toEJson(),
       'expirationDate': expirationDate.toEJson(),
     };
