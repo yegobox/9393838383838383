@@ -41,7 +41,7 @@ mixin VariantPatch {
             variant.bhfId == null ||
             variant.itemTyCd == null ||
             variant.bhfId!.isEmpty) {
-          localRealm!.write(() {
+          localRealm.write(() {
             variant.taxTyCd = "B";
             variant.bhfId = "00";
             variant.qtyUnitCd = "U";
