@@ -68,4 +68,6 @@ abstract class LocalStorage {
   bool A4();
   int? numberOfPayments();
   bool exportAsPdf();
+  bool? initialization();
+  String? dvcSrlNo();
 }

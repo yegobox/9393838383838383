@@ -66,7 +66,9 @@ class SharedPreferenceStorage implements LocalStorage {
         'purchaseCode',
         'A4',
         'numberOfPayments',
-        'exportAsPdf'
+        'exportAsPdf',
+        'initialization',
+        'dvcSrlNo'
       },
     ));
     return this;
@@ -388,5 +390,15 @@ class SharedPreferenceStorage implements LocalStorage {
   @override
   bool exportAsPdf() {
     return prefs.getBool('exportAsPdf') ?? false;
+  }
+
+  @override
+  bool? initialization() {
+    return prefs.getBool('initialization') ?? false;
+  }
+
+  @override
+  String? dvcSrlNo() {
+    return prefs.getString('dvcSrlNo') ?? "vsdcyegoboxltd";
   }
 }

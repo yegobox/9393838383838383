@@ -28,6 +28,7 @@ class _AdminControlState extends State<AdminControl> {
   bool forceUPSERT = false;
   bool stopTaxService = false;
   bool switchToCloudSync = false;
+  bool ebmInitialization = false;
   @override
   void initState() {
     super.initState();
@@ -340,6 +341,22 @@ class _AdminControlState extends State<AdminControl> {
     }
   }
 
+  void initialization(bool value) async {
+    await ProxyService.box.writeBool(
+        key: 'initialization', value: !ProxyService.box.initialization()!);
+
+    await ProxyService.local.initializeEbm(
+      bhfId: (await ProxyService.box.bhfId()) ?? "00",
+      tin: ProxyService.box.tin().toString(),
+      dvcSrlNo: ProxyService.box.dvcSrlNo() ?? "vsdcyegoboxltd",
+      flipperHttpClient: ProxyService.http,
+    );
+
+    setState(() {
+      ebmInitialization = ProxyService.box.initialization()!;
+    });
+  }
+
   void enableDebugFunc(bool value) async {
     await ProxyService.box
         .writeBool(key: 'enableDebug', value: !ProxyService.box.enableDebug()!);
@@ -507,6 +524,24 @@ class _AdminControlState extends State<AdminControl> {
                           icon: Icons.sync,
                           value: switchToCloudSync,
                           onChanged: enableSyncStrategyFunc,
+                        ),
+                      )
+                    ],
+                  ),
+                ],
+              ),
+              SettingsSection(
+                title: 'Initialization',
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SwitchSettingsCard(
+                          title: 'Initialization',
+                          subtitle: 'Initialize EBM',
+                          icon: Icons.sync,
+                          value: ebmInitialization,
+                          onChanged: initialization,
                         ),
                       )
                     ],

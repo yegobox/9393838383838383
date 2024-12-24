@@ -615,7 +615,8 @@ abstract class RealmInterface {
       {TransactionPaymentRecord? paymentRecord,
       int? transactionId,
       double amount = 0.0,
-      String? paymentMethod, required bool singlePaymentOnly});
+      String? paymentMethod,
+      required bool singlePaymentOnly});
   List<TransactionPaymentRecord> getPaymentType({required int transactionId});
 
   void updateCounters({
@@ -658,4 +659,9 @@ abstract class RealmInterface {
     required Map<String, String> itemClasses,
     required Map<String, String> itemTypes,
   });
+  FutureOr<void> initializeEbm(
+      {required String bhfId,
+      required String tin,
+      required String dvcSrlNo,
+      required HttpClientInterface flipperHttpClient});
 }

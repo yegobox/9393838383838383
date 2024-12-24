@@ -941,6 +941,9 @@ class RWTax with NetworkHelper, StockPatch implements TaxApi {
         .toString();
 
     final data = item.toJson();
+    data['tin'] = ProxyService.box.tin();
+    data['modrNm'] = randomNumber();
+    data['bhfId'] = (await ProxyService.box.bhfId()) ?? "00";
     final talker = Talker();
 
     try {

@@ -20,6 +20,51 @@ import 'dart:collection';
 import 'package:flutter/services.dart';
 import 'dart:async';
 
+mixin VariantPatch {
+  static void patchVariant(
+      {Realm? localRealm,
+      required String URI,
+      required Function(String) sendPort}) async {
+    List<Variant> variants =
+        localRealm!.query<Variant>(r'ebmSynced == $0', [false]).toList();
+
+    for (Variant variant in variants) {
+      try {
+        IVariant iVariant =
+            IVariant.fromJson(variant.toEJson().toFlipperJson());
+
+        iVariant.isrcAplcbYn =
+            variant.isrcAplcbYn?.isEmpty ?? true ? "N" : variant.isrcAplcbYn;
+
+        /// do not attempt saving a variant with missing fields
+        if (variant.qtyUnitCd == null ||
+            variant.taxTyCd == null ||
+            variant.bhfId == null ||
+            variant.itemTyCd == null ||
+            variant.bhfId!.isEmpty) {
+          // set defaults
+          localRealm!.write(() {
+            variant.taxTyCd = "B";
+            variant.bhfId = "00";
+            variant.qtyUnitCd = "U";
+            variant.itemTyCd =
+                "Flipper-" + randomNumber().toString().substring(0, 5);
+          });
+        }
+        final response = await RWTax().saveItem(variation: iVariant, URI: URI);
+
+        if (response.resultCd == "000") {
+          sendPort(
+              'notification:${response.resultMsg}:variant:${variant.id.toString()}');
+        } else {
+          sendPort('notification:${response.resultMsg}}');
+        }
+      } catch (e, s) {
+        talker.error(s);
+      }
+    }
+  }
+}
 mixin StockPatch {
   static void patchStock(
       {Realm? localRealm,
@@ -63,6 +108,135 @@ mixin StockPatch {
         } catch (e) {
           rethrow;
         }
+      }
+    }
+  }
+}
+mixin PatchTransactionItem {
+  static Future<void> patchTransactionItem(
+      {Realm? localRealm,
+      required String URI,
+      required Function(String) sendPort,
+      required int tinNumber,
+      required String bhfId}) async {
+    List<ITransaction> transactions = localRealm!.query<ITransaction>(
+        r'ebmSynced == $0 && status == $1 && customerName != null && customerTin != null',
+        [false, COMPLETE]).toList();
+
+    print("transactions count ${transactions.length}");
+    for (ITransaction transaction in transactions) {
+      double taxB = 0;
+      // double taxC = 0;
+      // double taxA = 0;
+      // double taxD = 0;
+      double totalvat = 0;
+
+      Configurations taxConfigTaxB =
+          localRealm!.query<Configurations>(r'taxType == $0', ["B"]).first;
+      // Configurations taxConfigTaxA =
+      //     localRealm!.query<Configurations>(r'taxType == $0', ["A"]).first;
+      // Configurations taxConfigTaxC =
+      //     localRealm!.query<Configurations>(r'taxType == $0', ["C"]).first;
+      // Configurations taxConfigTaxD =
+      //     localRealm!.query<Configurations>(r'taxType == $0', ["D"]).first;
+
+      List<TransactionItem> items = localRealm!.query<TransactionItem>(
+          r'transactionId == $0', [transaction.id]).toList();
+
+      for (var item in items) {
+        if (item.taxTyCd == "B") {
+          taxB += (item.price * item.qty);
+        }
+        // if (item.taxTyCd == "C") {
+        //   taxC += (item.price * item.qty);
+        // }
+        // if (item.taxTyCd == "A") {
+        //   taxA += (item.price * item.qty);
+        // }
+        // if (item.taxTyCd == "D") {
+        //   taxD += (item.price * item.qty);
+        // }
+      }
+      // final totalTaxA = calculateTotalTax(taxA, taxConfigTaxA);
+      final totalTaxB = calculateTotalTax(taxB, taxConfigTaxB);
+      // final totalTaxC = calculateTotalTax(taxC, taxConfigTaxC);
+      // final totalTaxD = calculateTotalTax(taxD, taxConfigTaxD);
+      totalvat = totalTaxB;
+
+      /// stop if transaction does not have customerName or customerTin
+      if (transaction.customerName == null || transaction.customerTin == null) {
+        continue;
+      }
+      try {
+        final response = await RWTax().saveStockItems(
+            transaction: transaction,
+            tinNumber: tinNumber.toString(),
+            bhFId: bhfId,
+            customerName: transaction.customerName ?? "N/A",
+            custTin: transaction.customerTin ?? "999909695",
+            regTyCd: "A",
+            //sarTyCd 11 is for sale
+            sarTyCd: transaction.sarTyCd ?? "11",
+            realm: localRealm,
+            custBhfId: transaction.customerBhfId ?? "",
+            totalSupplyPrice: transaction.subTotal,
+            totalvat: totalvat,
+            totalAmount: transaction.subTotal,
+            remark: transaction.remark ?? "",
+            ocrnDt: DateTime.parse(
+                transaction.updatedAt ?? DateTime.now().toString()),
+            URI: URI);
+
+        if (response.resultCd == "000") {
+          sendPort(
+              'notification:${response.resultMsg}:transaction:${transaction.id.toString()}');
+        } else {
+          sendPort('notification:${response.resultMsg}}');
+        }
+        print(response);
+      } catch (e) {}
+    }
+  }
+
+  static double calculateTotalTax(double tax, Configurations config) {
+    final percentage = config.taxPercentage ?? 0;
+    return (tax * percentage) / 100 + percentage;
+  }
+}
+mixin CustomerPatch {
+  static void patchCustomer(
+      {Realm? localRealm,
+      required String URI,
+      required Function(String) sendPort,
+      required int tinNumber,
+      required String bhfId,
+      required int branchId}) async {
+    // load all customer
+    List<Customer> customers =
+        localRealm!.query<Customer>(r'branchId ==$0', [branchId]).toList();
+
+    for (Customer customer in customers) {
+      if (!customer.ebmSynced) {
+        try {
+          localRealm!.write(() {
+            // Update customer properties within the write transaction
+            customer.tin = tinNumber;
+            customer.bhfId = bhfId;
+          });
+
+          if ((customer.custTin?.length ?? 0) < 9) return;
+          ICustomer iCustomer =
+              ICustomer.fromJson(customer.toEJson().toFlipperJson());
+
+          final response =
+              await RWTax().saveCustomer(customer: iCustomer, URI: URI);
+          if (response.resultCd == "000") {
+            sendPort(
+                'notification:${response.resultMsg.substring(0, 10)}:customer:${customer.id.toString()}');
+          } else {
+            sendPort('notification:${response.resultMsg}}');
+          }
+        } catch (e) {}
       }
     }
   }
@@ -143,164 +317,45 @@ class IsolateHandler with StockPatch {
           if (localRealm == null) {
             localRealm = Realm(configLocal);
           }
-          double calculateTotalTax(double tax, Configurations config) {
-            final percentage = config.taxPercentage ?? 0;
-            return (tax * percentage) / 100 + percentage;
-          }
 
           /// handle missing value, part of self healing
           _selfHeal(localRealm: localRealm);
 
-          List<ITransaction> transactions = localRealm!.query<ITransaction>(
-              r'ebmSynced == $0 && status == $1 && customerName != null && customerTin != null',
-              [false, COMPLETE]).toList();
-
-          print("transactions count ${transactions.length}");
-          for (ITransaction transaction in transactions) {
-            double taxB = 0;
-            // double taxC = 0;
-            // double taxA = 0;
-            // double taxD = 0;
-            double totalvat = 0;
-
-            Configurations taxConfigTaxB = localRealm!
-                .query<Configurations>(r'taxType == $0', ["B"]).first;
-            // Configurations taxConfigTaxA =
-            //     localRealm!.query<Configurations>(r'taxType == $0', ["A"]).first;
-            // Configurations taxConfigTaxC =
-            //     localRealm!.query<Configurations>(r'taxType == $0', ["C"]).first;
-            // Configurations taxConfigTaxD =
-            //     localRealm!.query<Configurations>(r'taxType == $0', ["D"]).first;
-
-            List<TransactionItem> items = localRealm!.query<TransactionItem>(
-                r'transactionId == $0', [transaction.id]).toList();
-
-            for (var item in items) {
-              if (item.taxTyCd == "B") {
-                taxB += (item.price * item.qty);
-              }
-              // if (item.taxTyCd == "C") {
-              //   taxC += (item.price * item.qty);
-              // }
-              // if (item.taxTyCd == "A") {
-              //   taxA += (item.price * item.qty);
-              // }
-              // if (item.taxTyCd == "D") {
-              //   taxD += (item.price * item.qty);
-              // }
-            }
-            // final totalTaxA = calculateTotalTax(taxA, taxConfigTaxA);
-            final totalTaxB = calculateTotalTax(taxB, taxConfigTaxB);
-            // final totalTaxC = calculateTotalTax(taxC, taxConfigTaxC);
-            // final totalTaxD = calculateTotalTax(taxD, taxConfigTaxD);
-            totalvat = totalTaxB;
-
-            /// stop if transaction does not have customerName or customerTin
-            if (transaction.customerName == null ||
-                transaction.customerTin == null) {
-              continue;
-            }
-            try {
-              final response = await RWTax().saveStockItems(
-                  transaction: transaction,
-                  tinNumber: tinNumber.toString(),
-                  bhFId: bhfId,
-                  customerName: transaction.customerName ?? "N/A",
-                  custTin: transaction.customerTin ?? "999909695",
-                  regTyCd: "A",
-                  //sarTyCd 11 is for sale
-                  sarTyCd: transaction.sarTyCd ?? "11",
-                  realm: localRealm!,
-                  custBhfId: transaction.customerBhfId ?? "",
-                  totalSupplyPrice: transaction.subTotal,
-                  totalvat: totalvat,
-                  totalAmount: transaction.subTotal,
-                  remark: transaction.remark ?? "",
-                  ocrnDt: DateTime.parse(
-                      transaction.updatedAt ?? DateTime.now().toString()),
-                  URI: URI);
-
-              if (response.resultCd == "000") {
-                sendPort.send(
-                    'notification:${response.resultMsg}:transaction:${transaction.id.toString()}');
-              } else {
-                sendPort.send('notification:${response.resultMsg}}');
-              }
-              print(response);
-            } catch (e) {}
-          }
-
+          //  patch transactionItem
+          PatchTransactionItem.patchTransactionItem(
+            URI: URI,
+            sendPort: (message) {
+              sendPort.send(message);
+            },
+            tinNumber: tinNumber,
+            bhfId: bhfId,
+          );
           StockPatch.patchStock(
-              URI: URI,
-              localRealm: localRealm,
-              sendPort: (message) {
-                sendPort.send(message);
-              });
+            URI: URI,
+            localRealm: localRealm,
+            sendPort: (message) {
+              sendPort.send(message);
+            },
+          );
 
-          List<Variant> variants =
-              localRealm!.query<Variant>(r'ebmSynced == $0', [false]).toList();
+          VariantPatch.patchVariant(
+            URI: URI,
+            localRealm: localRealm,
+            sendPort: (message) {
+              sendPort.send(message);
+            },
+          );
 
-          for (Variant variant in variants) {
-            try {
-              IVariant iVariant =
-                  IVariant.fromJson(variant.toEJson().toFlipperJson());
-
-              iVariant.isrcAplcbYn = variant.isrcAplcbYn?.isEmpty ?? true
-                  ? "N"
-                  : variant.isrcAplcbYn;
-
-              /// do not attempt saving a variant with missing fields
-              if (variant.qtyUnitCd == null ||
-                  variant.taxTyCd == null ||
-                  variant.bhfId == null ||
-                  variant.bhfId!.isEmpty) {
-                // set defaults
-                variant.taxTyCd = "B";
-                variant.bhfId = "00";
-                variant.qtyUnitCd = "U";
-              }
-              final response =
-                  await RWTax().saveItem(variation: iVariant, URI: URI);
-
-              if (response.resultCd == "000") {
-                sendPort.send(
-                    'notification:${response.resultMsg}:variant:${variant.id.toString()}');
-              } else {
-                sendPort.send('notification:${response.resultMsg}}');
-              }
-            } catch (e, s) {
-              talker.error(s);
-            }
-          }
-
-          // load all customer
-          List<Customer> customers = localRealm!
-              .query<Customer>(r'branchId ==$0', [branchId]).toList();
-
-          for (Customer customer in customers) {
-            if (!customer.ebmSynced) {
-              try {
-                localRealm!.write(() {
-                  // Update customer properties within the write transaction
-                  customer.tin = tinNumber;
-                  customer.bhfId = bhfId;
-                });
-
-                if ((customer.custTin?.length ?? 0) < 9) return;
-                ICustomer iCustomer =
-                    ICustomer.fromJson(customer.toEJson().toFlipperJson());
-
-                final response =
-                    await RWTax().saveCustomer(customer: iCustomer, URI: URI);
-                if (response.resultCd == "000") {
-                  sendPort.send(
-                      'notification:${response.resultMsg.substring(0, 10)}:customer:${customer.id.toString()}');
-                } else {
-                  sendPort.send('notification:${response.resultMsg}}');
-                }
-              } catch (e) {}
-            }
-          }
+          CustomerPatch.patchCustomer(
+            URI: URI,
+            localRealm: localRealm,
+            tinNumber: tinNumber,
+            bhfId: bhfId,
+            branchId: branchId,
+            sendPort: (message) {
+              sendPort.send(message);
+            },
+          );
         }
       }
     });

@@ -257,6 +257,7 @@ class _ImportPurchasePageState extends ConsumerState<ImportPurchasePage>
           /// save purchased item
           await ProxyService.tax.savePurchases(
               item: supplier,
+            
               bhfId: (await ProxyService.box.bhfId()) ?? "00",
               realm: ProxyService.local.realm!,
               // P is Purchase, it has sort order of 1

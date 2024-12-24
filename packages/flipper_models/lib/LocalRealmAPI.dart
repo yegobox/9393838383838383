@@ -5745,4 +5745,20 @@ class LocalRealmApi
   String randomizeColor() {
     return '#${(Random().nextInt(0x1000000) | 0x800000).toRadixString(16).padLeft(6, '0').toUpperCase()}';
   }
+
+  @override
+  FutureOr<void> initializeEbm(
+      {required String bhfId,
+      required String tin,
+      required String dvcSrlNo,
+      required HttpClientInterface flipperHttpClient}) async {
+    final url = await ProxyService.box.getServerUrl();
+    final response = await flipperHttpClient.post(
+      Uri.parse(url! + '/initializer/selectInitInfo'),
+      body: jsonEncode(
+          <String, String?>{"tin": tin, "bhfId": bhfId, "dvcSrlNo": dvcSrlNo}),
+    );
+    talker.warning("Response: ${response.statusCode}");
+    talker.warning("Response: ${response.body}");
+  }
 }

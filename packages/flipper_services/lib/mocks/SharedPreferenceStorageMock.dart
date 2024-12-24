@@ -306,4 +306,16 @@ class SharedPreferenceStorageMock implements LocalStorage {
   bool exportAsPdf() {
     return false;
   }
+
+  @override
+  String? dvcSrlNo() {
+    // TODO: implement dvcSrlNo
+    throw UnimplementedError();
+  }
+
+  @override
+  bool? initialization() {
+    // TODO: implement initialization
+    throw UnimplementedError();
+  }
 }
