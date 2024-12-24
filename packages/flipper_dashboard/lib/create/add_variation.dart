@@ -9,8 +9,11 @@ import 'package:flipper_routing/app.locator.dart';
 import 'package:stacked_services/stacked_services.dart';
 
 class AddVariation extends StatefulWidget {
-  const AddVariation({Key? key, required this.productId}) : super(key: key);
+  const AddVariation(
+      {Key? key, required this.productId, required this.productName})
+      : super(key: key);
   final int productId;
+  final String productName;
   static final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
@@ -49,7 +52,9 @@ class _AddVariationState extends State<AddVariation> {
                   onPressed: () async {
                     if (AddVariation._formKey.currentState!.validate()) {
                       /// TODO: change this hard coded on mobile later.
-                      await _saveVariation(model, selectedProductType: "1");
+                      await _saveVariation(model,
+                          selectedProductType: "1",
+                          productName: widget.productName);
                       _routerService.pop();
                     }
                   },
@@ -165,6 +170,7 @@ class _AddVariationState extends State<AddVariation> {
     ProductViewModel model, {
     required String selectedProductType,
     Map<int, TextEditingController>? rates,
+    required String productName,
     Map<int, TextEditingController>? dates,
   }) async {
     Business business = await ProxyService.local.getBusiness();
@@ -219,6 +225,7 @@ class _AddVariationState extends State<AddVariation> {
     await model.addVariant(
       selectedProductType: selectedProductType,
       packagingUnit: "BJ",
+      productName: productName,
       rates: rates,
       dates: dates,
       variations: variations,

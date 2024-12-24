@@ -643,7 +643,7 @@ abstract class RealmInterface {
     Map<int, String>? rates,
     double? supplyPrice,
     Map<int, String>? dates,
-    String? selectedProductType,
+    String? selectedProductType, required bool ebmSynced,
   });
 
   // Stock createStock({
@@ -664,4 +664,12 @@ abstract class RealmInterface {
       required String tin,
       required String dvcSrlNo,
       required HttpClientInterface flipperHttpClient});
+  FutureOr<String> itemCode({
+    required String countryCode, // e.g., "RW"
+    required String productType, // e.g., "2"
+    required String packagingUnit, // e.g., "NT"
+    required String quantityUnit,
+  });
+
+  FutureOr<void> updateProduct({required int id, required String name});
 }

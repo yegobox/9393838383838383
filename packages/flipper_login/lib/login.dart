@@ -40,9 +40,9 @@ class _LoginState extends State<Login> {
           await (Connectivity().checkConnectivity());
       if (connectivityResult == ConnectivityResult.mobile ||
           connectivityResult == ConnectivityResult.wifi) {
-        LoginInfo().noNet = false;
+        // LoginInfo().noNet = false;
       } else {
-        LoginInfo().noNet = true;
+        // LoginInfo().noNet = true;
       }
     }
   }

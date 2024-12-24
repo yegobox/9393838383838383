@@ -207,6 +207,7 @@ class StackedRouterWeb extends _i4.RootStackRouter {
         child: _i1.AddVariation(
           key: args.key,
           productId: args.productId,
+          productName: args.productName,
         ),
         opaque: true,
         barrierDismissible: false,
@@ -1331,12 +1332,14 @@ class AddVariationRoute extends _i4.PageRouteInfo<AddVariationArgs> {
   AddVariationRoute({
     _i5.Key? key,
     required int productId,
+    required String productName,
   }) : super(
           AddVariationRoute.name,
           path: '/add-variation',
           args: AddVariationArgs(
             key: key,
             productId: productId,
+            productName: productName,
           ),
         );
 
@@ -1347,11 +1350,13 @@ class AddVariationArgs {
   const AddVariationArgs({
     this.key,
     required this.productId,
+    required this.productName,
   });
 
   final _i5.Key? key;
 
   final int productId;
+  final String productName;
 
   @override
   String toString() {
@@ -2590,12 +2595,14 @@ extension RouterStateExtension on _i3.RouterService {
   Future<dynamic> navigateToAddVariation({
     _i5.Key? key,
     required int productId,
+    required String productName,
     void Function(_i4.NavigationFailure)? onFailure,
   }) async {
     return navigateTo(
       AddVariationRoute(
         key: key,
         productId: productId,
+        productName: productName,
       ),
       onFailure: onFailure,
     );
@@ -3295,11 +3302,13 @@ extension RouterStateExtension on _i3.RouterService {
   Future<dynamic> replaceWithAddVariation({
     _i5.Key? key,
     required int productId,
+    required String productName,
     void Function(_i4.NavigationFailure)? onFailure,
   }) async {
     return replaceWith(
       AddVariationRoute(
         key: key,
+        productName: productName,
         productId: productId,
       ),
       onFailure: onFailure,

@@ -1270,7 +1270,7 @@ class LocalRealmApi
                   .toDouble(),
               productId: variation.productId,
               active: false);
-          realm!.put<Stock>(newStock, tableName: 'stocks');
+          realm!.write(() => realm!.add<Stock>(newStock));
         }
 
         stock!.currentStock =
@@ -1291,7 +1291,9 @@ class LocalRealmApi
 
         talker.info("Saving variant when scanning..... [1]");
 
-        realm!.put<Variant>(variation, tableName: 'variants');
+        realm!.write(() {
+          realm!.add<Variant>(variation);
+        });
 
         final newStock = Stock(ObjectId(),
             id: stockId,
@@ -1304,10 +1306,15 @@ class LocalRealmApi
             productId: variation.productId)
           ..active = true;
 
-        realm!.put<Stock>(newStock, tableName: 'stocks');
+        realm!.write(() {
+          realm!.add<Stock>(
+            newStock,
+          );
+        });
       }
     } catch (e, s) {
-      talker.error(s);
+      talker.error(e, s);
+      rethrow;
     }
   }
 
@@ -5518,6 +5525,7 @@ class LocalRealmApi
     String? color,
     double? newRetailPrice,
     double? retailPrice,
+    bool ebmSynced = false,
     double? supplyPrice,
     Map<int, String>? dates,
     Map<int, String>? rates,
@@ -5540,7 +5548,7 @@ class LocalRealmApi
         }
 
         updatables[i].itemNm = updatables[i].name;
-        updatables[i].ebmSynced = false;
+        updatables[i].ebmSynced = ebmSynced;
         updatables[i].retailPrice =
             newRetailPrice == null ? updatables[i].retailPrice : newRetailPrice;
         updatables[i].itemTyCd = selectedProductType;
@@ -5557,6 +5565,7 @@ class LocalRealmApi
         }
 
         updatables[i].stock?.rsdQty = (updatables[i].stock?.rsdQty ?? 0);
+        updatables[i].stock?.ebmSynced = ebmSynced;
         updatables[i].stock?.currentStock = (updatables[i].stock?.rsdQty ?? 0);
         updatables[i].stock?.variant = updatables[i];
         updatables[i].lastTouched = DateTime.now().toLocal();
@@ -5760,5 +5769,47 @@ class LocalRealmApi
     );
     talker.warning("Response: ${response.statusCode}");
     talker.warning("Response: ${response.body}");
+  }
+
+  @override
+  FutureOr<String> itemCode(
+      {required String countryCode,
+      required String productType,
+      required String packagingUnit,
+      required String quantityUnit}) async {
+    final repository = Repository();
+    final Query = brick.Query(
+      where: [brick.Where('itemCode').isNot(null)],
+      providerArgs: {'orderBy': 'itemCode DESC'},
+    );
+    final items = await repository.get<models.ItemCode>(
+        query: Query, policy: OfflineFirstGetPolicy.awaitRemoteWhenNoneExist);
+
+    // Extract the last sequence number and increment it
+    int lastSequence = 0;
+    if (items.isNotEmpty) {
+      final lastItemCode = items.first.itemCode;
+      final sequencePart = lastItemCode.substring(lastItemCode.length - 7);
+      lastSequence = int.parse(sequencePart);
+    }
+    final newSequence = (lastSequence + 1).toString().padLeft(7, '0');
+    // Construct the new item code
+    final newItemCode =
+        '$countryCode$productType$packagingUnit$quantityUnit$newSequence';
+
+    // Save the new item code in the database
+    final newItem = brick.ItemCode(
+        itemCode: newItemCode, id: randomNumber(), createdAt: DateTime.now());
+    await repository.upsert(newItem);
+
+    return newItemCode;
+  }
+
+  @override
+  FutureOr<void> updateProduct({required int id, required String name}) {
+    final product = realm!.query<Product>(r'id == $0', [id]).first;
+    realm!.write(() {
+      product.name = name;
+    });
   }
 }

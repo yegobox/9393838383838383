@@ -33,3 +33,4 @@ export 'transactionItem.model.dart';
 export 'stockRequest.model.dart';
 export 'transactionPaymentRecord.dart';
 export 'flipperSaleCompagin.dart';
+export 'itemCode.model.dart';

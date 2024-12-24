@@ -57,7 +57,7 @@ export 'package:flipper_login/AuthWithMultipleProviders.dart';
 export 'package:flipper_login/country_picking_page.dart';
 export 'package:flipper_login/phone_input_screen.dart';
 
-export 'package:flipper_models/view_models/gate.dart';
+// export 'package:flipper_models/view_models/gate.dart';
 export 'package:flipper_socials/ui/views/home/home_view.dart';
 export 'package:flipper_socials/ui/views/chat_list/chat_list_view.dart';
 export 'package:flipper_socials/ui/views/conversation_historty/conversation_history.mobile.dart';

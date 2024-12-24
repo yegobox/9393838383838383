@@ -49,7 +49,8 @@ class Repository extends OfflineFirstWithSupabaseRepository {
     final (client, queue) = OfflineFirstWithSupabaseRepository.clientQueue(
       databaseFactory:
           Platform.isWindows ? databaseFactoryFfi : databaseFactory,
-      databasePath: queuePath,
+      databasePath:
+          Platform.isWindows ? queuePath : "brick_offline_queue.sqlite",
     );
 
     final supabase = await Supabase.initialize(

@@ -21,50 +21,43 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 
 mixin VariantPatch {
-  static void patchVariant(
+  static Future<void> patchVariant(
       {Realm? localRealm,
       required String URI,
       required Function(String) sendPort}) async {
     List<Variant> variants =
         localRealm!.query<Variant>(r'ebmSynced == $0', [false]).toList();
+    // delete all variants
+    localRealm.write(() {
+      for (Variant variant in variants) {
+        if (variant.name == TEMP_PRODUCT) {
+          localRealm.delete<Variant>(variant);
+        }
+      }
+    });
 
     for (Variant variant in variants) {
       try {
         IVariant iVariant =
             IVariant.fromJson(variant.toEJson().toFlipperJson());
 
-        iVariant.isrcAplcbYn =
-            variant.isrcAplcbYn?.isEmpty ?? true ? "N" : variant.isrcAplcbYn;
-
-        if (variant.qtyUnitCd == null ||
-            variant.taxTyCd == null ||
-            variant.bhfId == null ||
-            variant.itemTyCd == null ||
-            variant.bhfId!.isEmpty) {
-          localRealm.write(() {
-            variant.taxTyCd = "B";
-            variant.bhfId = "00";
-            variant.qtyUnitCd = "U";
-            variant.itemTyCd =
-                "Flipper-" + randomNumber().toString().substring(0, 5);
-          });
-        }
         final response = await RWTax().saveItem(variation: iVariant, URI: URI);
 
         if (response.resultCd == "000") {
-          sendPort(
-              'notification:${response.resultMsg}:variant:${variant.id.toString()}');
-        } else {
-          sendPort('notification:${response.resultMsg}}');
+          sendPort('${response.resultMsg}:variant:${variant.id.toString()}');
+          localRealm.write(() {
+            variant.ebmSynced = true;
+          });
         }
       } catch (e, s) {
-        talker.error(s);
+        talker.error(e, s);
+        rethrow;
       }
     }
   }
 }
 mixin StockPatch {
-  static void patchStock(
+  static Future<void> patchStock(
       {Realm? localRealm,
       required String URI,
       required Function(String) sendPort}) async {
@@ -94,9 +87,12 @@ mixin StockPatch {
           final response = await RWTax()
               .saveStockMaster(stock: iStock, variant: iVariant, URI: URI);
           if (response.resultCd == "000") {
-            sendPort('Stock update:${response.resultMsg}');
+            sendPort('${response.resultMsg}');
+            localRealm.write(() {
+              stock.ebmSynced = true;
+            });
           } else {
-            sendPort('Stock update:${response.resultMsg}}');
+            sendPort('${response.resultMsg}}');
           }
         } catch (e) {
           rethrow;
@@ -163,6 +159,9 @@ mixin PatchTransactionItem {
         if (response.resultCd == "000") {
           sendPort(
               'notification:${response.resultMsg}:transaction:${transaction.id.toString()}');
+          localRealm.write(() {
+            transaction.ebmSynced = true;
+          });
         } else {
           sendPort('notification:${response.resultMsg}}');
         }
@@ -267,8 +266,9 @@ class IsolateHandler with StockPatch {
           PatchTransactionItem.patchTransactionItem(
             URI: URI,
             sendPort: (message) {
-              sendPort.send(message);
+              sendPort.send("notification:" + message);
             },
+            localRealm: localRealm,
             tinNumber: tinNumber,
             bhfId: bhfId,
           );
@@ -276,7 +276,7 @@ class IsolateHandler with StockPatch {
             URI: URI,
             localRealm: localRealm,
             sendPort: (message) {
-              sendPort.send(message);
+              sendPort.send("notification:" + message);
             },
           );
 
@@ -284,7 +284,7 @@ class IsolateHandler with StockPatch {
             URI: URI,
             localRealm: localRealm,
             sendPort: (message) {
-              sendPort.send(message);
+              sendPort.send("notification:" + message);
             },
           );
 
@@ -295,7 +295,7 @@ class IsolateHandler with StockPatch {
             bhfId: bhfId,
             branchId: branchId,
             sendPort: (message) {
-              sendPort.send(message);
+              sendPort.send("notification:" + message);
             },
           );
         }

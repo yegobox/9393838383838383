@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:flipper_models/helperModels/random.dart';
+import 'package:flipper_models/isolateHandelr.dart';
 import 'package:flipper_models/power_sync/schema.dart';
 import 'package:flipper_models/realmExtension.dart';
 import 'package:flipper_models/realm_model_export.dart';
@@ -24,7 +25,6 @@ class ScannViewModel extends ProductViewModel with RRADEFAULTS {
     pkgUnits = RRADEFAULTS.packagingUnits;
     log(ProxyService.box.tin().toString(), name: "ScannViewModel");
     log((await ProxyService.box.bhfId()).toString(), name: "ScannViewModel");
-
 
     /// when ebm enabled,additional feature will start to appear on UI e.g when adding new product on desktop
     EBMenabled = ProxyService.box.tin() != -1 &&
@@ -214,11 +214,26 @@ class ScannViewModel extends ProductViewModel with RRADEFAULTS {
       try {
         ProxyService.local.updateVariant(
           updatables: scannedVariants,
+          ebmSynced: false,
           newRetailPrice: newRetailPrice,
           rates: rates?.map((key, value) => MapEntry(key, value.text)),
           dates: dates?.map((key, value) => MapEntry(key, value.text)),
           supplyPrice: supplyPrice != 0 ? supplyPrice : null,
           retailPrice: retailPrice != 0 ? retailPrice : null,
+        );
+        await VariantPatch.patchVariant(
+          URI: (await ProxyService.box.getServerUrl())!,
+          localRealm: ProxyService.local.realm,
+          sendPort: (message) {
+            // ProxyService.notification.sendLocalNotification(body: message);
+          },
+        );
+        StockPatch.patchStock(
+          URI: (await ProxyService.box.getServerUrl())!,
+          localRealm: ProxyService.local.realm,
+          sendPort: (message) {
+            ProxyService.notification.sendLocalNotification(body: message);
+          },
         );
       } catch (e) {
         talker.error(e);

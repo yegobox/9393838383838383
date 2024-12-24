@@ -369,6 +369,7 @@ class ProductEntryScreenState extends ConsumerState<ProductEntryScreen> {
       await model.addVariant(
           rates: _rates,
           dates: _dates,
+          productName: productNameController.text,
           variations: model.scannedVariants,
           selectedProductType: selectedProductType,
           packagingUnit: selectedPackageUnitValue.split(":")[0]);

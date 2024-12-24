@@ -180,7 +180,10 @@ class RWTax with NetworkHelper, StockPatch implements TaxApi {
           .replace(path: Uri.parse(URI).path + 'stockMaster/saveStockMaster')
           .toString();
       if (variant.productName == TEMP_PRODUCT) {
-        throw Exception("Invalid product");
+        return RwApiResponse(
+            resultCd: "010",
+            resultMsg: "Wrong item, can't save",
+            resultDt: "20241123193851");
       }
 
       /// update the remaining stock of this item in rra
@@ -257,6 +260,11 @@ class RWTax with NetworkHelper, StockPatch implements TaxApi {
     final url = Uri.parse(URI)
         .replace(path: Uri.parse(URI).path + 'items/saveItems')
         .toString();
+    if (variation.name == TEMP_PRODUCT)
+      return RwApiResponse(
+          resultCd: "010",
+          resultMsg: "Wrong item, can't save",
+          resultDt: "20241123193851");
 
     try {
       final response = await sendPostRequest(url, variation.toJson());

@@ -1,5 +1,6 @@
 import 'package:flipper_models/helperModels/random.dart';
 import 'package:flipper_models/helperModels/talker.dart';
+import 'package:flipper_models/isolateHandelr.dart';
 import 'package:flipper_models/realm_model_export.dart';
 import 'package:flipper_services/product_service.dart';
 import 'package:flipper_services/proxy.dart';
@@ -32,6 +33,7 @@ mixin ProductMixin {
       required packagingUnit,
       Map<int, TextEditingController>? rates,
       Map<int, TextEditingController>? dates,
+      required String productName,
       required String selectedProductType}) async {
     ///loop variations add pkgUnitCd this come from UI but a lot of
     ///EBM fields will be hard coded to simplify the UI, so we will loop the variation
@@ -39,8 +41,12 @@ mixin ProductMixin {
     Business business = await ProxyService.local
         .getBusiness(businessId: ProxyService.box.getBusinessId()!);
     try {
+      // find the related product to update its name
+      final product =
+          await ProxyService.local.getProduct(id: variations!.first.productId!);
+      ProxyService.local.updateProduct(id: product!.id!, name: productName);
       List<Variant> updatables = [];
-      for (var i = 0; i < variations!.length; i++) {
+      for (var i = 0; i < variations.length; i++) {
         variations[i].pkgUnitCd = packagingUnit;
         final number = randomNumber().toString().substring(0, 5);
 
@@ -57,10 +63,14 @@ mixin ProductMixin {
 
         variations[i].color = currentColor;
         variations[i].pkg = "1";
-        variations[i].itemCd = DateTime.now().generateFlipperClip();
+        variations[i].itemCd = await ProxyService.local.itemCode(
+            countryCode: "RW",
+            productType: "2",
+            packagingUnit: packagingUnit,
+            quantityUnit: "CT");
         variations[i].modrNm = number;
+        // variations[i].productName = productName;
         variations[i].modrId = number;
-        variations[i].itemNm = variations[i].name;
         variations[i].regrId = randomNumber().toString().substring(0, 5);
 
         variations[i].itemTyCd = selectedProductType;
@@ -70,7 +80,7 @@ mixin ProductMixin {
         variations[i].isrcAplcbYn = "N";
         variations[i].useYn = "N";
         variations[i].itemSeq = i;
-        variations[i].itemStdNm = variations[i].name;
+        variations[i].itemStdNm = productName;
         variations[i].taxPercentage = 18.0;
         // await setTaxPercentage(variations[i]);
 
@@ -83,9 +93,11 @@ mixin ProductMixin {
         /// country of origin for this item we default until we support something different
         /// and this will happen when we do import.
         variations[i].orgnNatCd = "RW";
+        variations[i].itemNm = productName;
+        variations[i].name = productName;
 
         /// registration name
-        variations[i].regrNm = variations[i].name;
+        variations[i].regrNm = productName;
 
         /// taxation type code
         variations[i].taxTyCd = variations[i].taxTyCd ??
@@ -97,7 +109,7 @@ mixin ProductMixin {
         // NOTE: I believe bellow item are required when saving purchase
         variations[i].spplrItemCd = "";
         variations[i].spplrItemClsCd = "";
-        variations[i].spplrItemNm = variations[i].name;
+        variations[i].spplrItemNm = productName;
         variations[i].ebmSynced = false;
 
         /// Packaging Unit
@@ -105,8 +117,23 @@ mixin ProductMixin {
         updatables.add(variations[i]);
       }
 
-      ProxyService.local.addVariant(
+      await ProxyService.local.addVariant(
           variations: updatables, branchId: ProxyService.box.getBranchId()!);
+      // add this variant to rra
+      await VariantPatch.patchVariant(
+        URI: (await ProxyService.box.getServerUrl())!,
+        localRealm: ProxyService.local.realm,
+        sendPort: (message) {
+          // ProxyService.notification.sendLocalNotification(body: message);
+        },
+      );
+      StockPatch.patchStock(
+        URI: (await ProxyService.box.getServerUrl())!,
+        localRealm: ProxyService.local.realm,
+        sendPort: (message) {
+          ProxyService.notification.sendLocalNotification(body: message);
+        },
+      );
     } catch (e, s) {
       talker.error(e);
       talker.error(s);
@@ -166,8 +193,9 @@ mixin ProductMixin {
           }
 
           // Update pkgUnitCd only if necessary (assuming it's not always changing)
-          if (variant.pkgUnitCd != "NT") {
-            variant.pkgUnitCd = "NT";
+          if (variant.pkgUnitCd != "CT") {
+            // CT for carton
+            variant.pkgUnitCd = "CT";
           }
         }
         return mproduct;
