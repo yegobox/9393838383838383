@@ -67,7 +67,7 @@ class Repository extends OfflineFirstWithSupabaseRepository {
     _singleton = Repository._(
       supabaseProvider: provider,
       sqliteProvider: SqliteProvider(
-        dbPath,
+        (Platform.isMacOS || Platform.isIOS) ? "flipper_v2.sqlite" : dbPath,
         databaseFactory:
             Platform.isWindows ? databaseFactoryFfi : databaseFactory,
         modelDictionary: sqliteModelDictionary,
